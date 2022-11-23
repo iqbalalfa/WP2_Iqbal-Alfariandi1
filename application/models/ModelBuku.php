@@ -1,68 +1,116 @@
 <?php
 defined('BASEPATH') or exit('No direct script access allowed');
-class ModelBuku extends CI_Model
+class Buku extends CI_Controller
 {
-    //manajemen buku
-    public function getBuku()
+    public function __construct()
     {
-        return $this->db->get('buku');
+        parent::__construct();
+        cek_login();
     }
-    public function bukuWhere($where)
+    //manajemen Buku
+    public function index()
     {
-        return $this->db->get_where('buku', $where);
-    }
-    public function simpanBuku($data = null)
-    {
-        $this->db->insert('buku', $data);
-    }
-    public function updateBuku($data = null, $where = null)
-    {
-        $this->db->update('buku', $data, $where);
-    }
-    public function hapusBuku($where = null)
-    {
-        $this->db->delete('buku', $where);
-    }
-    public function total($field, $where)
-    {
-        $this->db->select_sum($field);
-        if (!empty($where) && count($where) > 0) {
-            $this->db->where($where);
+        $data['judul'] = 'Data Buku';
+        $data['user'] = $this->ModelUser->cekData(['email' => $this->session->userdata('email')])->row_array();
+        $data['buku'] = $this->ModelBuku->tampil()->result_array();
+        $data['kategori'] = $this->ModelBuku->getKategori()->result_array();
+        $this->form_validation->set_rules('judul_buku', 'Judul 
+Buku', 'required|min_length[3]', [
+            'required' => 'Judul Buku harus diisi',
+            'min_length' => 'Judul buku terlalu pendek'
+        ]);
+        $this->form_validation->set_rules(
+            'id_kategori',
+            'Kategori',
+            'required',
+            [
+                'required' => 'Nama pengarang harus diisi',
+            ]
+        );
+        $this->form_validation->set_rules('pengarang', 'Nama 
+Pengarang', 'required|min_length[3]', [
+            'required' => 'Nama pengarang harus diisi',
+            'min_length' => 'Nama pengarang terlalu pendek'
+        ]);
+        $this->form_validation->set_rules('penerbit', 'Nama 
+Penerbit', 'required|min_length[3]', [
+            'required' => 'Nama penerbit harus diisi',
+            'min_length' => 'Nama penerbit terlalu pendek'
+        ]);
+        $this->form_validation->set_rules(
+            'tahun',
+            'Tahun Terbit',
+            'required|min_length[3]|max_length[4]|numeric',
+            [
+                'required' => 'Tahun terbit harus diisi',
+                'min_length' => 'Tahun terbit terlalu pendek',
+                'max_length' => 'Tahun terbit terlalu panjang',
+                'numeric' => 'Hanya boleh diisi angka'
+            ]
+        );
+        $this->form_validation->set_rules(
+            'isbn',
+            'Nomor ISBN',
+            'required|min_length[3]|numeric',
+            [
+                'required' => 'Nama ISBN harus diisi',
+                'min_length' => 'Nama ISBN terlalu pendek',
+                'numeric' => 'Yang anda masukan bukan angka'
+            ]
+        );
+        $this->form_validation->set_rules(
+            'stok',
+            'Stok',
+            'required|numeric',
+            [
+                'required' => 'Stok harus diisi',
+                'numeric' => 'Yang anda masukan bukan angka'
+            ]
+        );
+        //konfigurasi sebelum gambar diupload
+        $config['upload_path'] = './assets/img/upload/';
+        $config['allowed_types'] = 'jpg|png|jpeg';
+        $config['max_size'] = '3000';
+        $config['max_width'] = '1024';
+        $config['max_height'] = '1000';
+        $config['file_name'] = 'img' . time();
+        $this->load->library('upload', $config);
+        if ($this->form_validation->run() == false) {
+            $this->load->view('templates/header', $data);
+            $this->load->view('templates/sidebar', $data);
+            $this->load->view('templates/topbar', $data);
+            $this->load->view('buku/index', $data);
+            $this->load->view('templates/footer');
+        } else {
+            if ($this->upload->do_upload('image')) {
+                $image = $this->upload->data();
+                $gambar = $image['file_name'];
+            } else {
+                $gambar = '';
+            }
+            $data = [
+                'judul_buku' => $this->input->post(
+                    'judul_buku',
+                    true
+                ),
+                'id_kategori' => $this->input->post(
+                    'id_kategori',
+                    true
+                ),
+                'pengarang' => $this->input->post(
+                    'pengarang',
+                    true
+                ),
+                'penerbit' => $this->input->post('penerbit', true),
+                'tahun_terbit' => $this->input->post('tahun', true),
+                'isbn' => $this->input->post('isbn', true),
+                'stok' => $this->input->post('stok', true),
+                'dipinjam' => 0,
+                'dibooking' => 0,
+                'image' => $gambar
+            ];
+            $this->ModelBuku->simpanBuku($data);
+            redirect('buku');
         }
-
-        $this->db->from('buku');
-        return $this->db->get()->row($field);
-    }
-
-    //manajemen kategori
-    public function getKategori()
-    {
-        return $this->db->get('kategori');
-    }
-    public function kategoriWhere($where)
-    {
-        return $this->db->get_where('kategori', $where);
-    }
-    public function simpanKategori($data = null)
-    {
-        $this->db->insert('kategori', $data);
-    }
-    public function hapusKategori($where = null)
-    {
-        $this->db->delete('kategori', $where);
-    }
-    public function updateKategori($where = null, $data = null)
-    {
-        $this->db->update('kategori', $data, $where);
-    }
-    //join
-    public function joinKategoriBuku($where)
-    {
-        $this->db->select('buku.id_kategori,kategori.kategori');
-        $this->db->from('buku');
-        $this->db->join('kategori', 'kategori.id = 
-buku.id_kategori');
-        $this->db->where($where);
-        return $this->db->get();
     }
 }
